@@ -18,9 +18,10 @@ struct Snake {
     delta: f64,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct Point(u32, u32);
 
+#[derive(PartialEq)]
 enum Direction {
     Left,
     Right,
@@ -39,7 +40,14 @@ impl World {
     }
 
     fn on_tick(self: &mut Self, delta_time: f64) {
+        if self.snake.try_eat(&self.apple) {
+            self.apple = Point::random(self.width, self.height);
+        }
         self.snake.on_tick(delta_time);
+    }
+
+    fn on_key(self: &mut Self, key: Key) {
+        self.snake.on_key(key);
     }
 }
 
@@ -54,9 +62,43 @@ impl Snake {
         self.delta += self.speed * delta_time;
 
         if self.delta > 1f64 {
-            println!("self.body is {:?}", self.body);
             self.delta -= 1f64;
             self.body = move_body(&mut self.body, &self.direction);
+        }
+    }
+
+    fn on_key(self: &mut Self, key: Key) {
+        match key {
+            Key::Up => {
+                if self.direction != Direction::Down {
+                    self.direction = Direction::Up;
+                }
+            }
+            Key::Down => {
+                if self.direction != Direction::Up {
+                    self.direction = Direction::Down;
+                }
+            }
+            Key::Left => {
+                if self.direction != Direction::Right {
+                    self.direction = Direction::Left;
+                }
+            }
+            Key::Right => {
+                if self.direction != Direction::Left {
+                    self.direction = Direction::Right;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn try_eat(self: &mut Self, apple: &Point) -> bool {
+        if self.body[0] == *apple {
+            self.body = grow_body(&mut self.body, &self.direction);
+            true
+        } else {
+            false
         }
     }
 }
@@ -67,6 +109,14 @@ fn move_body(mut body: &mut Vec<Point>, direction: &Direction) -> Vec<Point> {
     let mut new_body = vec![new_head];
     let len = body.len() - 1;
     body.split_off(len);
+    new_body.append(&mut body);
+    new_body
+}
+
+fn grow_body(mut body: &mut Vec<Point>, direction: &Direction) -> Vec<Point> {
+    let head = body[0];
+    let new_head = head.mv(direction);
+    let mut new_body = vec![new_head];
     new_body.append(&mut body);
     new_body
 }
@@ -133,5 +183,24 @@ fn main() {
         if let Some(ua) = event.update_args() {
             world.on_tick(ua.dt);
         }
+
+        match event {
+            Event::Input(input) => {
+                match input {
+                    Input::Button(button_args) => {
+                        if button_args.state == ButtonState::Press {
+                            match button_args.button {
+                                Button::Keyboard(key) => {
+                                    world.on_key(key);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        };
     }
 }
